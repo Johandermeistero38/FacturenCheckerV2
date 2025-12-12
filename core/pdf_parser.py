@@ -1,19 +1,12 @@
-import pdfplumber
-
-
-def extract_rows_from_pdf(pdf_file):
+def extract_rows_from_pdf(file) -> list:
     """
-    Leest een PDF en geeft ruwe tekstregels terug.
-    (We houden dit bewust simpel in V2)
+    Dummy parser – wordt later uitgebreid.
     """
-    rows = []
-
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if not text:
-                continue
-            for line in text.split("\n"):
-                rows.append(line.strip())
-
-    return rows
+    return [
+        {
+            "fabric": "cosa",
+            "width": 140,
+            "height": 250,
+            "price": 99.0,
+        }
+    ]
