@@ -1,91 +1,100 @@
 import streamlit as st
 import pandas as pd
-import os
+from pathlib import Path
 
 from core.pdf_parser import extract_rows_from_pdf
 from core.matrix_loader import load_price_matrices
 from core.matcher import evaluate_rows
 
-# ============================================================
+
+# =========================================================
 # CONFIG
-# ============================================================
+# =========================================================
+
+BASE_DIR = Path(__file__).parent
+MATRIX_DIR = BASE_DIR / "data" / "matrices" / "toppoint"
 
 st.set_page_config(
     page_title="Facturen Checker – TOPPOINT (V2)",
-    layout="wide",
+    layout="wide"
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MATRIX_DIR = os.path.join(BASE_DIR, "data", "matrices", "toppoint")
 
-# ============================================================
+# =========================================================
 # UI
-# ============================================================
+# =========================================================
 
 st.title("🔍 Facturen Checker – TOPPOINT (V2)")
+st.write("Upload een verkoopfactuur (PDF). Alle gordijnregels worden gecontroleerd.")
 
 uploaded_file = st.file_uploader(
     "Upload verkoopfactuur (PDF)",
     type=["pdf"]
 )
 
-# ============================================================
-# LOAD MATRICES
-# ============================================================
 
-price_matrices = load_price_matrices(MATRIX_DIR)
+# =========================================================
+# LOGIC
+# =========================================================
 
-if not price_matrices:
-    st.warning("Nog geen prijsmatrices gevonden.")
-else:
-    st.success(f"✅ {len(price_matrices)} prijsmatrices geladen")
-
-# ============================================================
-# PROCESS PDF
-# ============================================================
-
-if uploaded_file and price_matrices:
-
-    with st.spinner("Factuur wordt verwerkt..."):
-        rows = extract_rows_from_pdf(uploaded_file)
+if uploaded_file:
+    # 1. Lees regels uit PDF
+    rows = extract_rows_from_pdf(uploaded_file)
 
     if not rows:
-        st.error("Geen geldige gordijnregels gevonden in de PDF.")
+        st.warning("Geen gordijnregels gevonden in de factuur.")
         st.stop()
 
-    results = evaluate_rows(rows, price_matrices)
+    # 2. Laad alle matrices
+    price_matrices = load_price_matrices(MATRIX_DIR)
 
-    # ========================================================
-    # RESULTATEN
-    # ========================================================
+    if not price_matrices:
+        st.error("Geen prijsmatrices gevonden.")
+        st.stop()
+
+    st.success(f"✅ {len(price_matrices)} prijsmatrices geladen")
+
+    # 3. Vergelijk regels met matrices
+    results = evaluate_rows(
+        invoice_rows=rows,
+        price_matrices=price_matrices
+    )
+
+    if not results:
+        st.warning("Geen resultaten om te tonen.")
+        st.stop()
+
+    # 4. Toon resultaten
+    df = pd.DataFrame(results)
+
+    df = df[
+        [
+            "fabric",
+            "quantity",
+            "width_mm",
+            "height_mm",
+            "invoice_unit_price",
+            "expected_unit_price",
+            "difference",
+            "status"
+        ]
+    ]
+
+    df = df.rename(
+        columns={
+            "fabric": "stof",
+            "quantity": "aantal",
+            "width_mm": "breedte (mm)",
+            "height_mm": "hoogte (mm)",
+            "invoice_unit_price": "factuurprijs p/st",
+            "expected_unit_price": "verwachte prijs p/st",
+            "difference": "verschil",
+            "status": "status"
+        }
+    )
 
     st.subheader("Resultaten")
+    st.dataframe(df, use_container_width=True)
 
-    if results:
-        df = pd.DataFrame(results)
-
-        # Mooie volgorde
-        df = df[
-            [
-                "fabric",
-                "width",
-                "height",
-                "price",
-                "expected_price",
-                "difference",
-                "status",
-            ]
-        ]
-
-        # Afronden
-        df["expected_price"] = df["expected_price"].round(2)
-        df["difference"] = df["difference"].round(2)
-
-        st.dataframe(
-            df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-    else:
-        st.info("Geen resultaten om te tonen.")
+else:
+    st.info("⬆️ Upload een PDF om te starten.")
