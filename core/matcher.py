@@ -1,30 +1,44 @@
-def evaluate_rows(rows: list, price_matrices: dict) -> list:
+def evaluate_rows(invoice_rows: list, price_matrices: dict) -> list:
     """
-    Vergelijkt factuurregels met prijsmatrices
+    Vergelijkt factuurregels met prijsmatrices.
     """
+
     results = []
 
-    for row in rows:
-        fabric = row.get("fabric", "").lower()
-        width = row.get("width")
-        height = row.get("height")
-        invoice_price = row.get("price")
+    for row in invoice_rows:
+        fabric = row["fabric"].lower()
+        width = row["width"]
+        height = row["height"]
+        price = row["price"]
 
-        matrix = price_matrices.get(fabric)
-
-        if matrix is None:
-            row["status"] = "❌ Geen prijsmatrix"
-            results.append(row)
+        if fabric not in price_matrices:
+            results.append({
+                **row,
+                "expected_price": None,
+                "difference": None,
+                "status": "❌ Geen matrix"
+            })
             continue
 
-        try:
-            expected_price = matrix.loc[height, width]
-            row["expected_price"] = expected_price
-            row["difference"] = invoice_price - expected_price
-            row["status"] = "✅ OK" if row["difference"] == 0 else "⚠️ Afwijking"
-        except Exception:
-            row["status"] = "❌ Maat niet gevonden"
+        matrix = price_matrices[fabric]
 
-        results.append(row)
+        # Zoek dichtstbijzijnde maat
+        matrix["diff"] = (
+            (matrix["width"] - width).abs()
+            + (matrix["height"] - height).abs()
+        )
+
+        best = matrix.sort_values("diff").iloc[0]
+        expected = float(best["price"])
+        difference = round(price - expected, 2)
+
+        status = "✅ OK" if abs(difference) < 0.5 else "⚠️ Afwijking"
+
+        results.append({
+            **row,
+            "expected_price": round(expected, 2),
+            "difference": difference,
+            "status": status
+        })
 
     return results
