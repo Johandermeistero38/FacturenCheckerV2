@@ -1,28 +1,29 @@
 import streamlit as st
-from core.pdf_parser import extract_rows_from_pdf
 from core.matrix_loader import load_price_matrices
+from core.pdf_parser import extract_rows_from_pdf
 from core.matcher import evaluate_rows
-import os
 
-st.set_page_config(page_title="Facturen Checker V2", layout="wide")
+st.set_page_config(page_title="Facturen Checker – TOPPOINT (V2)")
+
 st.title("🔍 Facturen Checker – TOPPOINT (V2)")
 
-# --- Upload ---
-pdf = st.file_uploader("Upload verkoopfactuur (PDF)", type="pdf")
+supplier = "toppoint"
 
-# --- Load matrices ---
-MATRIX_PATH = "data/matrices/toppoint"
+uploaded_file = st.file_uploader(
+    "Upload verkoopfactuur (PDF)", type=["pdf"]
+)
 
-if not os.path.exists(MATRIX_PATH):
-    st.warning("Nog geen prijsmatrices gevonden.")
-else:
-    matrices = load_price_matrices(MATRIX_PATH)
-    st.success(f"{len(matrices)} prijsmatrices geladen")
+if uploaded_file:
+    rows = extract_rows_from_pdf(uploaded_file)
 
-# --- Process ---
-if pdf and os.path.exists(MATRIX_PATH):
-    rows = extract_rows_from_pdf(pdf)
-    st.info(f"{len(rows)} regels uit PDF gehaald")
+    matrices = load_price_matrices(supplier)
 
-    results = evaluate_rows(rows, matrices)
-    st.write(results)
+    if not matrices:
+        st.warning("⚠️ Geen prijsmatrices gevonden")
+    else:
+        st.success(f"✅ {len(matrices)} prijsmatrices geladen")
+
+        results = evaluate_rows(rows, matrices)
+
+        st.subheader("Resultaten")
+        st.write(results)
